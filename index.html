@@ -1,0 +1,135 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <title>Daftar Kehadiran</title>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+    input, select, button { padding: 10px; margin: 5px 0; width: 100%; max-width: 500px; }
+    .hidden { display: none; }
+    .success { color: green; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h2>Daftar Kehadiran Pelajar</h2>
+<form id="attendanceForm">
+  <input type="text" name="nama" placeholder="Nama Pelajar" required><br>
+  <input type="text" name="ic" placeholder="No Kad Pengenalan" required><br>
+  <select name="semester" required>
+    <option value="">-- Pilih Semester --</option>
+    <option value="1">Semester 1</option>
+    <option value="2">Semester 2</option>
+    <option value="3">Semester 3</option>
+    <option value="4">Semester 4</option>
+  </select><br>
+  <input type="text" name="aktiviti" placeholder="Aktiviti" required><br>
+  <input type="text" name="lokasi" id="lokasi" readonly><br>
+  <button type="submit">Daftar</button>
+</form>
+
+<p id="notif" class="hidden"></p>
+
+<script>
+  const form = document.getElementById('attendanceForm');
+  const notif = document.getElementById('notif');
+  const lokasiInput = document.getElementById('lokasi');
+
+  const targetLat = 6.0367;  // LAT QR
+  const targetLng = 116.1295; // LNG QR
+  const allowedRadius = 5; // meter
+
+  const formActionURL = "https://docs.google.com/forms/u/0/d/e/1FAIpQLSePy_lWOqhrF0hdm1QtRWgprtdbk5Nme3Ae4DCZd7973Ua3zw/formResponse ";
+  const entries = {
+    nama: "entry.1918062404",
+    ic: "entry.1536587",81
+    semester: "entry.839139050",
+    aktiviti: "entry.1427354593",
+    lokasi: "entry.38750037"
+  };
+
+  const telegramBotToken = " 7998366292:AAFxWVTKtYiB8xGDdIXgTtEs5TpZCDFg4qg ";
+  const telegramChatID = "-1002747656322";
+
+  function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // earth radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(Δφ/2)2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    lokasiInput.value = ${lat}, ${lng};
+  }, () => {
+    notif.textContent = "❌ Lokasi tidak dapat dikesan.";
+    notif.className = "error";
+    notif.classList.remove("hidden");
+  });
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    notif.classList.add("hidden");
+
+    const latlng = lokasiInput.value.split(',').map(Number);
+    const jarak = getDistance(latlng[0], latlng[1], targetLat, targetLng);
+
+    if (jarak > allowedRadius) {
+      notif.textContent = "❌ Anda berada di luar lingkungan 5 meter.";
+      notif.className = "error";
+      notif.classList.remove("hidden");
+
+      const nama = form.nama.value;
+      const ic = form.ic.value;
+      const lokasi = lokasiInput.value;
+      const msg = ⚠️ Cubaan Daftar Luar Radius!\nNama: ${nama}\nIC: ${ic}\nLokasi: ${lokasi}\nJarak: ${jarak.toFixed(2)} meter;
+
+      fetch(https://api.telegram.org/bot${telegramBotToken}/sendMessage, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: telegramChatID, text: msg })
+      });
+
+      return;
+    }
+
+    const data = new FormData();
+    data.append(entries.nama, form.nama.value);
+    data.append(entries.ic, form.ic.value);
+    data.append(entries.semester, form.semester.value);
+    data.append(entries.aktiviti, form.aktiviti.value);
+    data.append(entries.lokasi, lokasiInput.value);
+
+    fetch(formActionURL, { method: "POST", body: data, mode: "no-cors" })
+      .then(() => {
+        notif.textContent = "✅ Kehadiran berjaya direkod!";
+        notif.className = "success";
+        notif.classList.remove("hidden");
+
+
+const msg = ✅ Kehadiran direkod\nNama: ${form.nama.value}\nIC: ${form.ic.value}\nLokasi: ${lokasiInput.value};
+        fetch(https://api.telegram.org/bot${telegramBotToken}/sendMessage, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: telegramChatID, text: msg })
+        });
+
+        form.reset();
+        lokasiInput.value = ${latlng[0]}, ${latlng[1]};
+      })
+      .catch(() => {
+        notif.textContent = "❌ Ralat semasa menghantar borang.";
+        notif.className = "error";
+        notif.classList.remove("hidden");
+      });
+  });
+</script>
+
+</body>
+</html>
